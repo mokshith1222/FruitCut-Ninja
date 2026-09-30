@@ -1,30 +1,28 @@
+import { HapticManager } from '../gamefeel/HapticManager';
+
 export class HapticSystem {
   static isSupported(): boolean {
-    return typeof navigator !== 'undefined' && 'vibrate' in navigator;
+    return HapticManager.isSupported();
   }
 
   static light() {
-    if (!this.isSupported()) return;
-    navigator.vibrate(10);
+    HapticManager.light();
   }
 
   static medium() {
-    if (!this.isSupported()) return;
-    navigator.vibrate(30);
+    HapticManager.medium();
   }
 
   static heavy() {
-    if (!this.isSupported()) return;
-    navigator.vibrate([50, 10, 50]);
+    HapticManager.heavy();
   }
 
   static success() {
-    if (!this.isSupported()) return;
-    navigator.vibrate([20, 50, 20, 50, 50]);
+    HapticManager.success();
   }
 
   static failure() {
-    if (!this.isSupported()) return;
-    navigator.vibrate([100, 50, 100, 50, 200]);
+    HapticManager.warning();
   }
 }
+

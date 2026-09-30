@@ -15,13 +15,15 @@ import { DailyRewardScreen }   from './screens/DailyRewardScreen';
 import { ChallengesScreen }    from './screens/ChallengesScreen';
 import { SettingsScreen }      from './screens/SettingsScreen';
 import { AdTestScreen }        from './screens/AdTestScreen';
+import { TimeAttackResultScreen } from './screens/TimeAttackResultScreen';
+import { EndlessResultScreen }    from './screens/EndlessResultScreen';
 
 // The full UI layer — routes all screens based on GamePhase
 export const GameUI = () => {
   const phase = useGameState(s => s.currentPhase);
 
   return (
-    <div style={{ position: 'absolute', inset: 0 }}>
+    <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <AnimatePresence mode="wait">
 
         {phase === GamePhase.BOOT && (
@@ -55,6 +57,14 @@ export const GameUI = () => {
 
         {phase === GamePhase.LEVEL_FAILED && (
           <LevelFailedScreen key="failed" />
+        )}
+
+        {phase === GamePhase.TIME_ATTACK_RESULT && (
+          <TimeAttackResultScreen key="ta_result" />
+        )}
+
+        {phase === GamePhase.ENDLESS_RESULT && (
+          <EndlessResultScreen key="endless_result" />
         )}
 
         {phase === GamePhase.SHOP && (

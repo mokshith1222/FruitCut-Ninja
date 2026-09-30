@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { EquipmentManager } from '../shop/EquipmentManager';
 
 export class VFXSystem {
   static scene: Phaser.Scene | null = null;
@@ -16,7 +17,48 @@ export class VFXSystem {
     
     // Parse hex
     const colorNum = Phaser.Display.Color.HexStringToColor(colorHex).color;
+    
+    // Get currently equipped effect
+    const effectItem = EquipmentManager.getEquippedItem('effect');
+    const effectId = effectItem ? effectItem.id : 'effect_juice';
 
+    if (effectId === 'effect_fire') {
+      // Fire Burst Effect
+      const emitter = this.scene.add.particles(x, y, 'particle_drop', {
+        speed: { min: 100, max: 350 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 0.6, end: 0 },
+        alpha: { start: 1, end: 0 },
+        tint: 0xFF4500, // Orange red
+        lifespan: 600,
+        gravityY: 0,
+        quantity: 20,
+        blendMode: 'ADD'
+      });
+      emitter.setDepth(80);
+      this.scene.time.delayedCall(600, () => emitter.destroy());
+      return;
+    }
+
+    if (effectId === 'effect_stars') {
+      // Star Burst Effect
+      const emitter = this.scene.add.particles(x, y, 'particle_drop', { // Use same texture, tint yellow/gold
+        speed: { min: 150, max: 250 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 0.5, end: 0 },
+        alpha: { start: 1, end: 0 },
+        tint: 0xFFD700,
+        lifespan: 800,
+        gravityY: 200,
+        quantity: 15,
+        blendMode: 'ADD'
+      });
+      emitter.setDepth(80);
+      this.scene.time.delayedCall(800, () => emitter.destroy());
+      return;
+    }
+
+    // Default Classic Juice
     // 1. Juicy wall splatter decal behind fruits
     const splatter = this.scene.add.graphics();
     splatter.setDepth(2); // In front of background, behind flying fruits (depth 5+)

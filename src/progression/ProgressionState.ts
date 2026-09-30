@@ -1,68 +1,69 @@
 import { create } from 'zustand';
-import { SaveSystem } from '../save/SaveSystem';
+import { AppSaveManager } from '../save/AppSaveManager';
+
+export interface GameSettings {
+  musicEnabled: boolean;
+  sfxEnabled: boolean;
+  hapticsEnabled: boolean;
+  screenShakeEnabled: boolean;
+  reducedMotion: boolean;
+}
 
 export interface PlayerProgress {
-  coins: number;
   completedLevels: string[];
   starsPerLevel: Record<string, number>;
-  unlockedSkins: string[];
-  currentSkin: string;
+  unlockedItems: string[];
+  equippedItems: Record<string, string>;
   dailyRewardDay: number;
   lastDailyClaimTime: number;
-  challengeProgress: Record<string, number>;
-  claimedChallenges: string[];
   bestTimeAttackScore: number;
   bestEndlessScore: number;
   bestEndlessTime: number;
+  settings: GameSettings;
 }
 
 const DEFAULT_PROGRESS: PlayerProgress = {
-  coins: 0,
   completedLevels: [],
   starsPerLevel: {},
-  unlockedSkins: ['default_blade'],
-  currentSkin: 'default_blade',
+  unlockedItems: ['blade_classic', 'trail_basic', 'effect_juice', 'theme_dojo'],
+  equippedItems: {
+    blade: 'blade_classic',
+    trail: 'trail_basic',
+    effect: 'effect_juice',
+    theme: 'theme_dojo'
+  },
   dailyRewardDay: 1,
   lastDailyClaimTime: 0,
-  challengeProgress: { cut_50: 0, combo_5: 0, level_5: 0, no_miss: 0, score_500: 0 },
-  claimedChallenges: [],
   bestTimeAttackScore: 0,
   bestEndlessScore: 0,
   bestEndlessTime: 0,
+  settings: {
+    musicEnabled: true,
+    sfxEnabled: true,
+    hapticsEnabled: true,
+    screenShakeEnabled: true,
+    reducedMotion: false,
+  },
 };
 
 interface ProgressionState extends PlayerProgress {
-  addCoins: (amount: number) => void;
-  spendCoins: (amount: number) => boolean;
   completeLevel: (levelId: string, stars: number) => void;
-  unlockSkin: (skinId: string) => void;
-  equipSkin: (skinId: string) => void;
-  claimDailyReward: (coins: number) => void;
-  updateChallengeProgress: (challengeId: string, value: number, isAbsolute?: boolean) => void;
-  claimChallengeReward: (challengeId: string, coins: number) => void;
+  unlockItem: (itemId: string) => void;
+  equipItem: (category: string, itemId: string) => void;
+  advanceDailyReward: () => void;
   updateBestScores: (mode: 'time_attack' | 'endless', score: number, timeSurvived?: number) => boolean;
-  loadProgress: () => void;
+  updateSettings: (newSettings: Partial<GameSettings>) => void;
+  loadProgress: (data: Partial<PlayerProgress>) => void;
 }
 
-export const useProgressionState = create<ProgressionState>((set, get) => ({
+export const useProgressionState = create<ProgressionState>((set) => ({
   ...DEFAULT_PROGRESS,
   
-  addCoins: (amount) => {
-    set((state) => {
-      const newState = { coins: state.coins + amount };
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
-    });
-  },
-  
-  spendCoins: (amount) => {
-    const state = get();
-    if (state.coins < amount) return false;
-    
-    const newState = { coins: state.coins - amount };
-    set(newState);
-    SaveSystem.saveProgress({ ...state, ...newState });
-    return true;
+  updateSettings: (newSettings) => {
+    set((state) => ({
+      settings: { ...state.settings, ...newSettings }
+    }));
+    AppSaveManager.save();
   },
   
   completeLevel: (levelId, stars) => {
@@ -73,70 +74,45 @@ export const useProgressionState = create<ProgressionState>((set, get) => ({
         ? state.completedLevels 
         : [...state.completedLevels, levelId];
       
-      const newState = {
+      return {
         starsPerLevel: { ...state.starsPerLevel, [levelId]: newStars },
         completedLevels
       };
-      
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
     });
+    AppSaveManager.save();
   },
   
-  unlockSkin: (skinId) => {
+  unlockItem: (itemId) => {
     set((state) => {
-      if (state.unlockedSkins.includes(skinId)) return state;
-      const newState = { unlockedSkins: [...state.unlockedSkins, skinId] };
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
+      if (state.unlockedItems.includes(itemId)) return state;
+      return { unlockedItems: [...state.unlockedItems, itemId] };
     });
+    AppSaveManager.save();
   },
   
-  equipSkin: (skinId) => {
+  equipItem: (category, itemId) => {
     set((state) => {
-      if (!state.unlockedSkins.includes(skinId)) return state;
-      const newState = { currentSkin: skinId };
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
+      if (!state.unlockedItems.includes(itemId)) return state;
+      return { 
+        equippedItems: {
+          ...state.equippedItems,
+          [category]: itemId
+        }
+      };
     });
+    AppSaveManager.save();
   },
   
-  claimDailyReward: (coins) => {
+  advanceDailyReward: () => {
     set((state) => {
       const now = Date.now();
       const nextDay = state.dailyRewardDay >= 7 ? 1 : state.dailyRewardDay + 1;
-      const newState = {
-        coins: state.coins + coins,
+      return {
         dailyRewardDay: nextDay,
         lastDailyClaimTime: now
       };
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
     });
-  },
-  
-  updateChallengeProgress: (challengeId, value, isAbsolute = false) => {
-    set((state) => {
-      const prev = state.challengeProgress[challengeId] || 0;
-      const next = isAbsolute ? Math.max(prev, value) : prev + value;
-      if (prev === next) return state;
-      
-      const newState = { challengeProgress: { ...state.challengeProgress, [challengeId]: next } };
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
-    });
-  },
-  
-  claimChallengeReward: (challengeId, coins) => {
-    set((state) => {
-      if (state.claimedChallenges.includes(challengeId)) return state;
-      const newState = {
-        coins: state.coins + coins,
-        claimedChallenges: [...state.claimedChallenges, challengeId]
-      };
-      SaveSystem.saveProgress({ ...get(), ...newState });
-      return newState;
-    });
+    AppSaveManager.save();
   },
   
   updateBestScores: (mode, score, timeSurvived = 0) => {
@@ -155,16 +131,20 @@ export const useProgressionState = create<ProgressionState>((set, get) => ({
           isNewBest = true;
         }
       }
-      if (isNewBest) SaveSystem.saveProgress({ ...get(), ...newState });
       return newState;
     });
+    if (isNewBest) AppSaveManager.save();
     return isNewBest;
   },
   
-  loadProgress: () => {
-    const data = SaveSystem.loadProgress();
-    if (data) {
-      set({ ...DEFAULT_PROGRESS, ...data });
-    }
+  loadProgress: (data) => {
+    set({
+      ...DEFAULT_PROGRESS,
+      ...data,
+      settings: {
+        ...DEFAULT_PROGRESS.settings,
+        ...(data?.settings || {})
+      }
+    });
   }
 }));

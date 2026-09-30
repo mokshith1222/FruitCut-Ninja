@@ -4,19 +4,26 @@ import { Screen, Stars } from '../components/Layout';
 import { Button } from '../components/Button';
 import { useGameState, GamePhase } from '../../core/GameState';
 import { useProgressionState } from '../../progression/ProgressionState';
-import { LevelDefinitions } from '../../levels/LevelDefinitions';
+import { LevelRegistry } from '../../core/progression/LevelRegistry';
 import { AdSystem } from '../../ads/AdSystem';
+import { AdsManager } from '../../ads/AdsManager';
 
-const calcStars = (score: number, targetScore: number) => {
-  if (score >= targetScore * 2) return 3;
-  if (score >= targetScore) return 2;
+import { RewardManager } from '../../economy/RewardManager';
+import { GameFeelManager } from '../../gamefeel/GameFeelManager';
+import { EconomyManager } from '../../economy/EconomyManager';
+
+const calcStars = (score: number, thresholds?: { one: number, two: number, three: number }) => {
+  if (!thresholds) return 1;
+  if (score >= thresholds.three) return 3;
+  if (score >= thresholds.two) return 2;
   return 1;
 };
 
 export const LevelCompleteScreen = () => {
   const { startGame, setPhase, score, currentLevelId, currentLevelConfig, misses } = useGameState();
-  const { addCoins, completeLevel, starsPerLevel, updateChallengeProgress, completedLevels, updateBestScores } = useProgressionState();
+  const { completeLevel, starsPerLevel, completedLevels, updateBestScores } = useProgressionState();
   const [rewardGranted, setRewardGranted] = useState(false);
+  const [earnedCoins, setEarnedCoins] = useState(0);
   const [doubleAdState, setDoubleAdState] = useState<'idle' | 'loading' | 'watched'>('idle');
   const [isNavigating, setIsNavigating] = useState(false);
   const [isNewBest, setIsNewBest] = useState(false);
@@ -24,12 +31,10 @@ export const LevelCompleteScreen = () => {
   const isSpecialMode = currentLevelId === 'time_attack' || currentLevelId === 'endless';
   const levelNum = parseInt(currentLevelId?.replace('level_', '') ?? '1');
   const titleText = isSpecialMode ? (currentLevelId === 'time_attack' ? 'Time Attack Complete!' : 'Endless Finished!') : `Level ${levelNum} Complete!`;
-  const target = currentLevelConfig?.targetScore ?? 0;
-  const earnedStars = calcStars(score, target > 0 ? target : 100);
-  const reward = currentLevelConfig?.rewardCoins ?? 50;
+  const earnedStars = calcStars(score, currentLevelConfig?.starThresholds);
   const prevStars = starsPerLevel[currentLevelId ?? ''] ?? 0;
   const nextLevelId = `level_${levelNum + 1}`;
-  const hasNextLevel = !!LevelDefinitions[nextLevelId];
+  const hasNextLevel = !!LevelRegistry[nextLevelId];
 
   useEffect(() => {
     if (!rewardGranted && currentLevelId) {
@@ -39,34 +44,61 @@ export const LevelCompleteScreen = () => {
           setIsNewBest(newBest);
         }
       } else {
+        const isFirstTime = !completedLevels.includes(currentLevelId);
+        
+        let totalCoins = RewardManager.grantLevelCompletion(currentLevelId, isFirstTime, currentLevelConfig?.rewards?.baseCoins || 0);
+        
+        // Calculate new stars earned
+        if (earnedStars > prevStars) {
+          const newStarIndices = [];
+          for (let i = prevStars + 1; i <= earnedStars; i++) {
+            newStarIndices.push(i);
+          }
+          totalCoins += RewardManager.grantLevelStars(currentLevelId, newStarIndices);
+        }
+        
+        setEarnedCoins(totalCoins);
         completeLevel(currentLevelId, earnedStars);
       }
-      addCoins(reward);
-      updateChallengeProgress('level_5', 1);
-      if (misses === 0) {
-        updateChallengeProgress('no_miss', 1);
-      }
+      
+      GameFeelManager.onLevelComplete();
       AdSystem.notifyLevelCompleted();
       setRewardGranted(true);
     }
-  }, [currentLevelId, rewardGranted, earnedStars, reward, addCoins, completeLevel, updateChallengeProgress, misses, isSpecialMode, updateBestScores, score]);
+  }, [currentLevelId, rewardGranted, earnedStars, currentLevelConfig, completeLevel, misses, isSpecialMode, updateBestScores, score, completedLevels, prevStars]);
+
+  const [adError, setAdError] = useState<string | null>(null);
 
   const handleNextAction = async (action: () => void) => {
     if (isNavigating) return;
     setIsNavigating(true);
-    if (AdSystem.shouldShowInterstitial(completedLevels.length)) {
-      await AdSystem.showInterstitial();
+    if (AdsManager.shouldShowInterstitial(completedLevels.length)) {
+      await AdsManager.showInterstitial(completedLevels.length);
     }
     action();
   };
 
   const handleDoubleReward = async () => {
-    if (doubleAdState !== 'idle') return;
+    if (doubleAdState !== 'idle' || earnedCoins <= 0) return;
     setDoubleAdState('loading');
-    const success = await AdSystem.showRewardedAd(() => {
-      addCoins(reward); // Grant second time
+    setAdError(null);
+
+    await AdsManager.showRewardedAd({
+      rewardType: 'DOUBLE_COINS',
+      amount: earnedCoins,
+      onSuccess: (amount) => {
+        EconomyManager.addCoins(amount, 'AD_REWARD', 'double_reward');
+        setDoubleAdState('watched');
+        GameFeelManager.onRewardClaimed();
+      },
+      onCancel: () => {
+        setDoubleAdState('idle');
+      },
+      onError: () => {
+        setDoubleAdState('idle');
+        setAdError('Ad unavailable right now.');
+      }
     });
-    setDoubleAdState(success ? 'watched' : 'idle');
   };
 
   return (
@@ -150,18 +182,33 @@ export const LevelCompleteScreen = () => {
           >
             <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 'var(--fs-body)' }}>Coins earned</span>
             <span style={{ fontSize: 'var(--fs-subheading)', fontWeight: 900, color: 'var(--c-coin)' }}>
-              +{reward} 🪙
+              +{earnedCoins} 🪙
             </span>
           </motion.div>
         </motion.div>
 
-          {/* Actions */}
+        {/* Actions */}
         <motion.div
           style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
+          {adError && (
+            <div style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              background: 'rgba(255, 68, 68, 0.15)',
+              border: '1px solid rgba(255, 68, 68, 0.3)',
+              color: '#ff8888',
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              width: '100%'
+            }}>
+              {adError}
+            </div>
+          )}
+
           {doubleAdState !== 'watched' && (
             <Button
               id="btn-double-coins"

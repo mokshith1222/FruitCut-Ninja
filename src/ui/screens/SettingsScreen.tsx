@@ -1,8 +1,18 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Screen } from '../components/Layout';
 import { IconButton } from '../components/Button';
 import { useGameState, GamePhase } from '../../core/GameState';
+import { useProgressionState } from '../../progression/ProgressionState';
+import { useCoinLedger } from '../../economy/CoinLedger';
+import { useChallengeState } from '../../challenges/ChallengeManager';
+import { AudioSystem } from '../../audio/AudioSystem';
+import { SaveSystem } from '../../save/SaveSystem';
+import { PrivacyPolicy } from '../../legal/PrivacyPolicy';
+import { TermsAndConditions } from '../../legal/TermsAndConditions';
+import { AdConfigManager } from '../../ads/AdConfig';
+
+const APP_VERSION = '1.0.0';
 
 const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
   <motion.div
@@ -29,12 +39,26 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   </motion.div>
 );
 
-const SettingRow = ({ label, sublabel, right }: { label: string; sublabel?: string; right: React.ReactNode }) => (
-  <div style={{
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '14px 0',
-    borderBottom: '1px solid var(--c-border)',
-  }}>
+const SettingRow = ({ 
+  label, 
+  sublabel, 
+  right, 
+  onClick 
+}: { 
+  label: string; 
+  sublabel?: string; 
+  right: React.ReactNode; 
+  onClick?: () => void;
+}) => (
+  <div 
+    onClick={onClick}
+    style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '14px 0',
+      borderBottom: '1px solid var(--c-border)',
+      cursor: onClick ? 'pointer' : 'default',
+    }}
+  >
     <div>
       <div style={{ fontWeight: 700, fontSize: 'var(--fs-body)' }}>{label}</div>
       {sublabel && <div style={{ fontSize: 'var(--fs-small)', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{sublabel}</div>}
@@ -45,10 +69,31 @@ const SettingRow = ({ label, sublabel, right }: { label: string; sublabel?: stri
 
 export const SettingsScreen = () => {
   const setPhase = useGameState(s => s.setPhase);
-  const [music, setMusic]       = useState(true);
-  const [sfx, setSfx]           = useState(true);
-  const [haptics, setHaptics]   = useState(true);
-  const [notifications, setNotifications] = useState(false);
+  const settings = useProgressionState(s => s.settings);
+  const updateSettings = useProgressionState(s => s.updateSettings);
+
+  const [activeLegalDoc, setActiveLegalDoc] = useState<'privacy' | 'terms' | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  const handleMusicChange = (val: boolean) => {
+    updateSettings({ musicEnabled: val });
+    if (!val) {
+      AudioSystem.stopMusic();
+    } else {
+      AudioSystem.playMusic('menu');
+    }
+  };
+
+  const handleResetData = () => {
+    SaveSystem.clearProgress();
+    useProgressionState.getState().loadProgress({});
+    useCoinLedger.getState().load({ balance: 0, transactions: [], claimedRewards: {} });
+    useChallengeState.getState().loadData({});
+    setShowResetModal(false);
+    setResetSuccess(true);
+    setTimeout(() => setResetSuccess(false), 2500);
+  };
 
   return (
     <Screen blurBg={false} style={{ background: 'var(--grad-bg)', alignItems: 'stretch' }}>
@@ -65,53 +110,138 @@ export const SettingsScreen = () => {
       </div>
 
       <div className="scroll-y" style={{ flex: 1, padding: '0 var(--sp-lg) var(--sp-2xl)' }}>
-        {/* Audio */}
+        {/* AUDIO SECTION */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
           <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: '24px 0 4px' }}>
             AUDIO
           </p>
-          <SettingRow label="Music" sublabel="Background music" right={<Toggle checked={music} onChange={setMusic} />} />
-          <SettingRow label="Sound Effects" sublabel="Cut & combo sounds" right={<Toggle checked={sfx} onChange={setSfx} />} />
+          <SettingRow 
+            label="Music" 
+            sublabel="Procedural background groove" 
+            right={<Toggle checked={settings.musicEnabled} onChange={handleMusicChange} />} 
+          />
+          <SettingRow 
+            label="Sound Effects" 
+            sublabel="Cut, combo, and slice audio" 
+            right={<Toggle checked={settings.sfxEnabled} onChange={(v) => updateSettings({ sfxEnabled: v })} />} 
+          />
         </motion.div>
 
-        {/* Gameplay */}
+        {/* GAMEPLAY & MOTION */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: '28px 0 4px' }}>
-            GAMEPLAY
+            GAMEPLAY & MOTION
           </p>
-          <SettingRow label="Haptics" sublabel="Vibration feedback" right={<Toggle checked={haptics} onChange={setHaptics} />} />
+          <SettingRow 
+            label="Haptics" 
+            sublabel="Tactile vibration feedback" 
+            right={<Toggle checked={settings.hapticsEnabled} onChange={(v) => updateSettings({ hapticsEnabled: v })} />} 
+          />
+          <SettingRow 
+            label="Screen Shake" 
+            sublabel="Impact and combo camera punch" 
+            right={<Toggle checked={settings.screenShakeEnabled} onChange={(v) => updateSettings({ screenShakeEnabled: v })} />} 
+          />
+          <SettingRow 
+            label="Reduced Motion" 
+            sublabel="Dampens camera shake and intense scaling" 
+            right={<Toggle checked={settings.reducedMotion} onChange={(v) => updateSettings({ reducedMotion: v })} />} 
+          />
         </motion.div>
 
-        {/* Notifications */}
+        {/* PRIVACY & LEGAL */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: '28px 0 4px' }}>
-            NOTIFICATIONS
+            PRIVACY & LEGAL
           </p>
-          <SettingRow label="Push Notifications" sublabel="Daily rewards & events" right={<Toggle checked={notifications} onChange={setNotifications} />} />
+          <SettingRow 
+            label="Privacy Policy" 
+            sublabel="Data transparency & advertising practices" 
+            right={<span style={{ color: 'var(--c-primary)', fontWeight: 700, fontSize: '0.85rem' }}>View →</span>} 
+            onClick={() => setActiveLegalDoc('privacy')}
+          />
+          <SettingRow 
+            label="Terms & Conditions" 
+            sublabel="Usage terms & virtual currency rules" 
+            right={<span style={{ color: 'var(--c-primary)', fontWeight: 700, fontSize: '0.85rem' }}>View →</span>} 
+            onClick={() => setActiveLegalDoc('terms')}
+          />
         </motion.div>
 
-        {/* About */}
+        {/* DATA MANAGEMENT */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: '28px 0 4px' }}>
+            DATA MANAGEMENT
+          </p>
+          <SettingRow 
+            label="Reset Local Game Data" 
+            sublabel="Purge local progress, scores, and inventory" 
+            right={
+              <button 
+                id="btn-reset-data"
+                className="btn btn--danger btn--sm"
+                onClick={() => setShowResetModal(true)}
+              >
+                Reset
+              </button>
+            } 
+          />
+          {resetSuccess && (
+            <div style={{ color: 'var(--c-success)', fontSize: '0.8rem', fontWeight: 700, marginTop: 6 }}>
+              ✓ Local game data reset to defaults.
+            </div>
+          )}
+        </motion.div>
+
+        {/* SUPPORT */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: '28px 0 4px' }}>
+            SUPPORT
+          </p>
+          <SettingRow 
+            label="Contact Developer" 
+            sublabel="Feedback, bug reports, and support" 
+            right={
+              <a 
+                href="mailto:mokshithnaik932@gmail.com" 
+                style={{ 
+                  color: 'var(--c-primary)', 
+                  fontSize: 'var(--fs-small)', 
+                  textDecoration: 'none', 
+                  fontWeight: 700,
+                  background: 'rgba(255,215,0,0.1)',
+                  padding: '6px 12px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,215,0,0.3)'
+                }}
+              >
+                Email Support
+              </a>
+            } 
+          />
+        </motion.div>
+
+        {/* ABOUT */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.4)', margin: '28px 0 4px' }}>
             ABOUT
           </p>
-          <SettingRow label="Version" right={<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 'var(--fs-small)' }}>1.0.0</span>} />
-          <SettingRow label="Developed by" right={<span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 'var(--fs-small)' }}>Mokshith Naik</span>} />
-          <SettingRow label="Contact" right={<a href="mailto:mokshithnaik932@gmail.com" style={{ color: 'var(--c-primary)', fontSize: 'var(--fs-small)', textDecoration: 'none', fontWeight: 600 }}>mokshithnaik932@gmail.com</a>} />
-          <SettingRow label="Privacy Policy" right={<a href="/privacy.html" target="_blank" rel="noreferrer" style={{ color: 'var(--c-secondary)', fontSize: 'var(--fs-small)', textDecoration: 'none', fontWeight: 600 }}>View →</a>} />
-          <SettingRow label="Terms of Service" right={<a href="/terms.html" target="_blank" rel="noreferrer" style={{ color: 'var(--c-secondary)', fontSize: 'var(--fs-small)', textDecoration: 'none', fontWeight: 600 }}>View →</a>} />
+          <SettingRow label="Version" right={<span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 'var(--fs-small)', fontWeight: 700 }}>{APP_VERSION}</span>} />
+          <SettingRow label="Developer" right={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 'var(--fs-small)', fontWeight: 700 }}>M Sai Mokshith Naik</span>} />
         </motion.div>
 
-        {/* Developer / Ad Test */}
-        {!import.meta.env.PROD && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+        {/* DEVELOPMENT AD TEST PANEL — visible when using Google test App ID */}
+        {AdConfigManager.getEnvironment() !== 'production' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
             <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'var(--c-primary)', margin: '28px 0 4px' }}>
-              DEVELOPMENT ONLY
+              DEVELOPMENT TEST PANEL
             </p>
             <SettingRow 
-              label="Ad Test Panel" 
+              label="Ad Testing Simulator" 
+              sublabel="Test interstitial & rewarded ad flows"
               right={
                 <button 
+                  id="btn-ad-test-panel"
                   className="btn btn--primary btn--sm" 
                   onClick={() => setPhase(GamePhase.AD_TEST)}
                 >
@@ -122,6 +252,67 @@ export const SettingsScreen = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Confirmation Modal for Resetting Local Data */}
+      <AnimatePresence>
+        {showResetModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 24, zIndex: 120
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              style={{
+                background: 'var(--c-surface)',
+                borderRadius: 20, padding: 24,
+                maxWidth: 340, width: '100%',
+                border: '1px solid rgba(255,255,255,0.1)',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>⚠️</div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: 8 }}>Reset Local Data?</h3>
+              <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: 20 }}>
+                This will purge all local campaign stars, high scores, coins, and cosmetic unlocks. This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button 
+                  className="btn btn--ghost btn--md" 
+                  onClick={() => setShowResetModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  id="btn-confirm-reset"
+                  className="btn btn--danger btn--md" 
+                  onClick={handleResetData}
+                >
+                  Yes, Reset
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* In-App Legal Document Presentation */}
+      <AnimatePresence>
+        {activeLegalDoc === 'privacy' && (
+          <PrivacyPolicy onBack={() => setActiveLegalDoc(null)} />
+        )}
+        {activeLegalDoc === 'terms' && (
+          <TermsAndConditions onBack={() => setActiveLegalDoc(null)} />
+        )}
+      </AnimatePresence>
     </Screen>
   );
 };

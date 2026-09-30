@@ -56,8 +56,7 @@ export const IconButton = ({ icon, onClick, variant = 'ghost', label, id }: Icon
       onClick();
     }}
     aria-label={label}
-    whileHover={{ scale: 1.1 }}
-    whileTap={{ scale: 0.88 }}
+    whileTap={{ scale: 0.92 }}
     transition={{ type: 'spring', stiffness: 400, damping: 20 }}
   >
     {icon}

@@ -4,13 +4,8 @@ import { Screen } from '../components/Layout';
 import { IconButton } from '../components/Button';
 import { useGameState, GamePhase } from '../../core/GameState';
 import { useProgressionState } from '../../progression/ProgressionState';
-import { LevelDefinitions, Worlds } from '../../levels/LevelDefinitions';
-
-const WORLD_THEMES = [
-  { id: Worlds.WORLD_1.id, name: '🌴 Tropical', bgGrad: 'var(--grad-world1)', accent: '#69F0AE' },
-  { id: Worlds.WORLD_2.id, name: '🍂 Orchard',  bgGrad: 'var(--grad-world2)', accent: '#FFAB40' },
-  { id: Worlds.WORLD_3.id, name: '❄️ Frozen',   bgGrad: 'var(--grad-world3)', accent: '#40C4FF' },
-];
+import { LevelRegistry } from '../../core/progression/LevelRegistry';
+import { WorldRegistry } from '../../core/progression/WorldRegistry';
 
 export const LevelMapScreen = () => {
   const startGame = useGameState(s => s.startGame);
@@ -19,9 +14,14 @@ export const LevelMapScreen = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Build level list grouped by world
-  const allLevels = Object.values(LevelDefinitions).sort((a, b) =>
-    parseInt(a.levelId.replace('level_', '')) - parseInt(b.levelId.replace('level_', ''))
-  );
+  const allLevels = Object.values(LevelRegistry).sort((a, b) => a.levelNumber - b.levelNumber);
+
+  const WORLD_THEMES = Object.values(WorldRegistry).sort((a, b) => a.levelStart - b.levelStart).map(w => ({
+    id: w.id,
+    name: w.name,
+    bgGrad: w.bgGradient,
+    accent: w.themeColor
+  }));
 
   const nextLevelIndex = completedLevels.length; // 0-based index of next to play
 
@@ -64,7 +64,7 @@ export const LevelMapScreen = () => {
               >
                 <h3 style={{ fontSize: 'var(--fs-subheading)', fontWeight: 800 }}>{world.name}</h3>
                 <p style={{ fontSize: 'var(--fs-small)', color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                  {worldLevels.filter(l => completedLevels.includes(l.levelId)).length} / {worldLevels.length} levels
+                  {worldLevels.filter(l => completedLevels.includes(l.id)).length} / {worldLevels.length} levels
                 </p>
               </motion.div>
 
@@ -75,9 +75,9 @@ export const LevelMapScreen = () => {
                 gap: '16px 8px',
               }}>
                 {worldLevels.map((level, lIdx) => {
-                  const globalIdx = allLevels.findIndex(l => l.levelId === level.levelId);
-                  const stars = starsPerLevel[level.levelId] || 0;
-                  const isCompleted = completedLevels.includes(level.levelId);
+                  const globalIdx = allLevels.findIndex(l => l.id === level.id);
+                  const stars = starsPerLevel[level.id] || 0;
+                  const isCompleted = completedLevels.includes(level.id);
                   const isCurrent = globalIdx === nextLevelIndex;
                   const isLocked = globalIdx > nextLevelIndex;
 
@@ -88,15 +88,15 @@ export const LevelMapScreen = () => {
 
                   return (
                     <motion.div
-                      key={level.levelId}
+                      key={level.id}
                       className={nodeClass}
                       initial={{ opacity: 0, scale: 0.7 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.05 * lIdx, type: 'spring', stiffness: 250, damping: 20 }}
-                      onClick={isLocked ? undefined : () => startGame(level.levelId)}
+                      onClick={isLocked ? undefined : () => startGame(level.id)}
                     >
                       <div className="level-node__circle">
-                        {isLocked ? '🔒' : isCompleted ? '✓' : parseInt(level.levelId.replace('level_', ''))}
+                        {isLocked ? '🔒' : isCompleted ? '✓' : level.levelNumber}
                       </div>
                       <div className="level-node__stars">
                         {[0,1,2].map(i => (
@@ -104,7 +104,7 @@ export const LevelMapScreen = () => {
                         ))}
                       </div>
                       <div className="level-node__label">
-                        Lv.{level.levelId.replace('level_', '')}
+                        Lv.{level.levelNumber}
                       </div>
                     </motion.div>
                   );

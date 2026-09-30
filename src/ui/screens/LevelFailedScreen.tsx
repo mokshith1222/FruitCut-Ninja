@@ -3,22 +3,31 @@ import { Screen } from '../components/Layout';
 import { Button } from '../components/Button';
 import { useGameState, GamePhase } from '../../core/GameState';
 import { useProgressionState } from '../../progression/ProgressionState';
-import { AdSystem } from '../../ads/AdSystem';
+import { AdsManager } from '../../ads/AdsManager';
+import { GameFeelManager } from '../../gamefeel/GameFeelManager';
 import { useState, useEffect } from 'react';
+
+// Track single revive limit per session run
+let sessionReviveCount = 0;
 
 export const LevelFailedScreen = () => {
   const { startGame, setPhase, score, currentLevelId, currentLevelConfig, misses, reviveGame } = useGameState();
   const { completedLevels, updateBestScores } = useProgressionState();
   const [adLoading, setAdLoading] = useState(false);
+  const [adError, setAdError] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [recorded, setRecorded] = useState(false);
   const [isNewBest, setIsNewBest] = useState(false);
+
   const isSpecialMode = currentLevelId === 'time_attack' || currentLevelId === 'endless';
+  const isTimeAttack = currentLevelId === 'time_attack';
+  const canRevive = !isTimeAttack && sessionReviveCount < 1;
   const levelNum = currentLevelId?.replace('level_', '') ?? '?';
-  const displayLevel = isSpecialMode ? (currentLevelId === 'time_attack' ? 'Time Attack' : 'Endless') : levelNum;
+  const displayLevel = isSpecialMode ? (isTimeAttack ? 'Time Attack' : 'Endless') : levelNum;
 
   useEffect(() => {
-    AdSystem.notifyLevelCompleted();
+    GameFeelManager.onLevelFailed();
+    AdsManager.notifyLevelCompleted();
     if (!recorded && currentLevelId === 'endless') {
       const newBest = updateBestScores('endless', score);
       setIsNewBest(newBest);
@@ -29,16 +38,42 @@ export const LevelFailedScreen = () => {
   const handleNextAction = async (action: () => void) => {
     if (isNavigating) return;
     setIsNavigating(true);
-    if (AdSystem.shouldShowInterstitial(completedLevels.length)) {
-      await AdSystem.showInterstitial();
+    sessionReviveCount = 0; // reset revive count on new run / exit
+    if (AdsManager.shouldShowInterstitial(completedLevels.length)) {
+      await AdsManager.showInterstitial(completedLevels.length);
     }
     action();
   };
 
+  const handleRevive = async () => {
+    if (adLoading || !canRevive) return;
+    setAdLoading(true);
+    setAdError(null);
+
+    await AdsManager.showRewardedAd({
+      rewardType: 'REVIVE',
+      amount: 1,
+      onSuccess: () => {
+        sessionReviveCount += 1;
+        setAdLoading(false);
+        GameFeelManager.onRewardClaimed();
+        reviveGame();
+      },
+      onCancel: () => {
+        setAdLoading(false);
+      },
+      onError: () => {
+        setAdLoading(false);
+        setAdError('Ad unavailable right now.');
+      }
+    });
+  };
+
   const failReason = () => {
-    if (currentLevelConfig?.noBombsAllowed) return 'You cut a bomb! 💣';
-    if (currentLevelConfig?.missLimit && misses >= currentLevelConfig.missLimit) return `Too many misses (${misses})`;
-    if (currentLevelConfig?.timeLimit) return 'Time ran out! ⏱';
+    const hasBombObj = currentLevelConfig?.objectives?.some(o => o.type === 'NO_BOMB' || o.type === 'BOMB_AVOIDANCE');
+    if (currentLevelConfig?.noBombsAllowed || hasBombObj) return 'You cut a bomb! 💣';
+    if (misses >= (currentLevelConfig?.missLimit || 3)) return `Too many misses (${misses})`;
+    if ((currentLevelConfig?.duration ?? 0) > 0) return 'Time ran out! ⏱';
     return 'Better luck next time!';
   };
 
@@ -102,6 +137,26 @@ export const LevelFailedScreen = () => {
           )}
         </motion.div>
 
+        {/* Ad Error Banner if applicable */}
+        {adError && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              background: 'rgba(255, 68, 68, 0.15)',
+              border: '1px solid rgba(255, 68, 68, 0.3)',
+              color: '#ff8888',
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              width: '100%'
+            }}
+          >
+            {adError}
+          </motion.div>
+        )}
+
         {/* Actions */}
         <motion.div
           style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}
@@ -109,18 +164,17 @@ export const LevelFailedScreen = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <Button
-            id="btn-revive"
-            label={adLoading ? 'Loading Ad...' : '🎥  Watch Ad to Revive'}
-            onClick={async () => {
-              setAdLoading(true);
-              await AdSystem.showRewardedAd(() => reviveGame());
-              setAdLoading(false);
-              // if it failed, it simply won't revive and we stay on this screen
-            }}
-            variant="secondary" size="xl" fullWidth disabled={adLoading || isNavigating}
-          />
-          <div className="divider" style={{ margin: '8px 0' }} />
+          {canRevive && (
+            <>
+              <Button
+                id="btn-revive"
+                label={adLoading ? 'Loading Ad...' : '🎥  Watch Ad to Revive (1x)'}
+                onClick={handleRevive}
+                variant="secondary" size="xl" fullWidth disabled={adLoading || isNavigating}
+              />
+              <div className="divider" style={{ margin: '4px 0' }} />
+            </>
+          )}
           <Button
             id="btn-retry"
             label="↺  Try Again"

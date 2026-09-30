@@ -39,6 +39,29 @@ export const LevelStartScreen = () => {
 
   if (!currentLevelConfig) return null;
 
+  const levelTag = (currentLevelConfig.id || currentLevelConfig.levelId || `Level ${currentLevelConfig.levelNumber || 1}`).replace('_', ' ').toUpperCase();
+  const levelTitle = currentLevelConfig.title || `Level ${currentLevelConfig.levelNumber || 1}`;
+  
+  const primaryObjective = currentLevelConfig.objectives?.[0];
+  let objectiveLabel = 'Slice all incoming fruits!';
+  if (primaryObjective) {
+    if (primaryObjective.type === 'SCORE') {
+      objectiveLabel = `Score ${primaryObjective.target?.toLocaleString() || 100} pts`;
+    } else if (primaryObjective.type === 'FRUIT_COUNT') {
+      objectiveLabel = `Slice ${primaryObjective.target || 10} fruits`;
+    } else if (primaryObjective.type === 'COMBO') {
+      objectiveLabel = `Reach a ${primaryObjective.target || 3}x combo`;
+    } else if (primaryObjective.type === 'PERFECT_CUTS') {
+      objectiveLabel = `Make ${primaryObjective.target || 5} perfect cuts`;
+    } else if (primaryObjective.type === 'NO_BOMB' || primaryObjective.type === 'BOMB_AVOIDANCE') {
+      objectiveLabel = 'Avoid all bombs!';
+    } else if (primaryObjective.type === 'SURVIVAL_TIME') {
+      objectiveLabel = `Survive for ${primaryObjective.target || currentLevelConfig.duration}s`;
+    } else {
+      objectiveLabel = String(primaryObjective.type).replace('_', ' ');
+    }
+  }
+
   return (
     <div style={{
       position: 'absolute', inset: 0,
@@ -63,19 +86,19 @@ export const LevelStartScreen = () => {
               fontSize: '1.2rem', color: 'var(--c-accent)', fontWeight: 800, letterSpacing: '0.1em',
               textTransform: 'uppercase', marginBottom: 8
             }}>
-              {currentLevelConfig.levelId.replace('_', ' ').toUpperCase()}
+              {levelTag}
             </div>
             <h1 style={{ 
               fontSize: 'clamp(2.5rem, 8vw, 4rem)', fontWeight: 900,
               textShadow: '0 4px 20px rgba(0,0,0,0.8)'
             }}>
-              {currentLevelConfig.title}
+              {levelTitle}
             </h1>
             <div style={{ 
               marginTop: 16, fontSize: '1.1rem', background: 'rgba(255,255,255,0.1)',
               padding: '8px 24px', borderRadius: '100px', display: 'inline-block'
             }}>
-              Objective: <strong style={{ color: 'var(--c-primary)' }}>{currentLevelConfig.objectiveType.replace('_', ' ')}</strong>
+              Objective: <strong style={{ color: 'var(--c-primary)' }}>{objectiveLabel}</strong>
             </div>
           </motion.div>
         )}
