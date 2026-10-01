@@ -62,9 +62,9 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
-        zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         padding: 24
       }}
       onClick={onClose}
@@ -85,13 +85,17 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
         }}
       >
         <button
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           style={{
-            position: 'absolute', top: 12, right: 12, zIndex: 10,
-            width: 32, height: 32, borderRadius: '50%',
-            background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.2)',
+            position: 'absolute', top: 16, right: 16, zIndex: 999,
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', fontSize: '1.2rem', cursor: 'pointer'
+            color: 'white', fontSize: '1.2rem', cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
           }}
           aria-label="Close"
         >
