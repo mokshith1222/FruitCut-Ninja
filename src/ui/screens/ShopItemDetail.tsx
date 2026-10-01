@@ -84,6 +84,20 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
           position: 'relative'
         }}
       >
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 10,
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontSize: '1.2rem', cursor: 'pointer'
+          }}
+          aria-label="Close"
+        >
+          ✕
+        </button>
+
         {/* Top Preview Area */}
         <div style={{ 
           height: 200, background: `linear-gradient(to bottom, ${rarityStyle.border}, rgba(0,0,0,0.2))`,
