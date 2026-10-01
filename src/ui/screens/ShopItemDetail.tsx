@@ -64,10 +64,15 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
-        zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: 24
+        zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+        pointerEvents: 'auto',
       }}
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <motion.div
         initial={{ y: 50, scale: 0.95 }}
@@ -81,27 +86,11 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
           border: `2px solid ${rarityStyle.border}`,
           overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
-          position: 'relative'
+          position: 'relative',
+          pointerEvents: 'auto',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
         }}
       >
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          style={{
-            position: 'absolute', top: 16, right: 16, zIndex: 999,
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', fontSize: '1.2rem', cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-          }}
-          aria-label="Close"
-        >
-          ✕
-        </button>
-
         {/* Top Preview Area */}
         <div style={{ 
           height: 200, background: `linear-gradient(to bottom, ${rarityStyle.border}, rgba(0,0,0,0.2))`,
@@ -126,6 +115,30 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
             {item.emoji}
           </motion.div>
         </div>
+
+        {/* Close Button ("Wrong" / Cross Button) placed after preview for correct stacking */}
+        <motion.button
+          type="button"
+          aria-label="Close"
+          whileTap={{ scale: 0.88 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          style={{
+            position: 'absolute', top: 14, right: 14, zIndex: 100,
+            width: 40, height: 40, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.65)', border: '2px solid rgba(255,255,255,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#ffffff', fontSize: '1.25rem', fontWeight: 'bold', cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          ✕
+        </motion.button>
 
         {/* Content Area */}
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -171,6 +184,12 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
                   onClick={handleEquip}
                 />
               )}
+              <Button 
+                label="CLOSE" 
+                variant="ghost" 
+                fullWidth size="md"
+                onClick={onClose}
+              />
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -194,6 +213,13 @@ export const ShopItemDetail = ({ item, onClose }: ShopItemDetailProps) => {
                   Not enough coins!
                 </p>
               )}
+
+              <Button 
+                label="CLOSE" 
+                variant="ghost" 
+                fullWidth size="md"
+                onClick={onClose}
+              />
             </div>
           )}
         </div>

@@ -278,6 +278,7 @@ export const ShopScreen = () => {
       position: 'absolute', inset: 0,
       display: 'flex', flexDirection: 'column',
       background: 'var(--grad-bg)',
+      pointerEvents: 'auto',
     }}>
       {/* Header */}
       <motion.div
