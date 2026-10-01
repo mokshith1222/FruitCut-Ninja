@@ -19,24 +19,31 @@ export class LevelMode implements GameMode {
     
     if (this.config.duration > 0) {
       state.tickTime(delta / 1000);
-      if (state.timeRemaining !== null && state.timeRemaining <= 0) {
-        const hasSurvival = this.config.objectives.some(o => o.type === 'SURVIVAL_TIME');
-        if (hasSurvival) {
-          // Verify other objectives are also met
-          let allMet = true;
-          const bestCombo = Math.max(state.combo, this.maxComboAchieved, this.scene.comboSystem.getMaxCombo());
-          for (const obj of this.config.objectives) {
-             if (obj.type === 'SCORE' && state.score < (obj.target || 0)) allMet = false;
-             if (obj.type === 'FRUIT_COUNT' && state.fruitsCut < (obj.target || 0)) allMet = false;
-             if (obj.type === 'COMBO' && bestCombo < (obj.target || 0)) allMet = false;
-          }
-          if (allMet) {
-             state.levelComplete();
+      
+      if (state.timeRemaining !== null) {
+        // If time runs out
+        if (state.timeRemaining <= 0) {
+          if (this.areAllObjectivesMet(state)) {
+            state.levelComplete();
           } else {
-             state.levelFailed();
+            state.levelFailed();
           }
-        } else {
-          state.levelFailed();
+        } 
+        // If they complete the objectives EARLY, and it's not a survival level, finish instantly
+        else if (state.currentPhase === 'PLAYING') {
+          const isSurvival = !this.config.objectives || this.config.objectives.length === 0 || this.config.objectives.some(o => 
+            o.type === 'SURVIVAL_TIME'
+          );
+          
+          if (!isSurvival && this.areAllObjectivesMet(state)) {
+            // Give a generous Time Bonus to ensure they can still hit 3 stars
+            const timeBonus = Math.floor(state.timeRemaining) * 50; 
+            if (timeBonus > 0) {
+              state.updateScore(timeBonus);
+              // Small popup could be nice but we'll just add it to score
+            }
+            state.levelComplete();
+          }
         }
       }
     }
@@ -56,37 +63,37 @@ export class LevelMode implements GameMode {
     }
 
     this.maxComboAchieved = Math.max(this.maxComboAchieved, state.combo, this.scene.comboSystem.getMaxCombo());
-    this.checkLevelObjectives(state);
+    // We update max combo, but we DO NOT instantly complete the level here.
+    // The player needs the full duration to maximize their score for stars.
   }
 
   onFruitMiss(_fruitData: any, isBomb: boolean) {
     const state = useGameState.getState();
     if (!isBomb) {
       state.incrementMisses();
-      
-      // Default 3 misses if not explicitly disabled. We can adjust this later.
-      if (state.misses >= 3) {
+      const missLimit = this.config.missLimit ?? 3;
+      if (state.misses >= missLimit) {
         state.levelFailed();
       }
     }
   }
 
-  private checkLevelObjectives(state: any) {
-    if (!this.config.objectives || this.config.objectives.length === 0) return;
+  private areAllObjectivesMet(state: any): boolean {
+    if (!this.config.objectives || this.config.objectives.length === 0) return true;
 
     const bestCombo = Math.max(state.combo, this.maxComboAchieved, this.scene.comboSystem.getMaxCombo());
-    let allCompleted = true;
-    for (const obj of this.config.objectives) {
-      if (obj.type === 'SCORE' && state.score < (obj.target || 0)) allCompleted = false;
-      if (obj.type === 'FRUIT_COUNT' && state.fruitsCut < (obj.target || 0)) allCompleted = false;
-      if (obj.type === 'COMBO' && bestCombo < (obj.target || 0)) allCompleted = false;
-    }
-
-    const hasSurvival = this.config.objectives.some(o => o.type === 'SURVIVAL_TIME');
     
-    if (allCompleted && !hasSurvival) {
-      state.levelComplete();
+    // Evaluate ALL objectives
+    for (const obj of this.config.objectives) {
+      if (obj.type === 'SCORE' && state.score < (obj.target || 0)) return false;
+      if (obj.type === 'FRUIT_COUNT' && state.fruitsCut < (obj.target || 0)) return false;
+      if (obj.type === 'COMBO' && bestCombo < (obj.target || 0)) return false;
+      // SURVIVAL_TIME is implicitly met if we reached the end of the timer without dying
+      if (obj.type === 'NO_BOMB' || obj.type === 'BOMB_AVOIDANCE') {
+        // Handled instantly on bomb cut, so if we survived, this is met.
+      }
     }
+    return true;
   }
 
   cleanup() {}

@@ -124,7 +124,7 @@ export class MainScene extends Phaser.Scene {
 
       this.activeMode.init(this, config);
       this.spawnSystem.init(config);
-      this.comboSystem.resetCombo();
+      this.comboSystem.resetAll();
       this.freezeTimer = 0;
     }
 

@@ -71,8 +71,7 @@ function App() {
         currentPhase === GamePhase.SHOP ||
         currentPhase === GamePhase.SETTINGS ||
         currentPhase === GamePhase.DAILY_REWARD ||
-        currentPhase === GamePhase.CHALLENGES ||
-        currentPhase === GamePhase.AD_TEST
+        currentPhase === GamePhase.CHALLENGES
       ) {
         setPhase(GamePhase.MAIN_MENU);
       } else if (currentPhase === GamePhase.MAIN_MENU) {

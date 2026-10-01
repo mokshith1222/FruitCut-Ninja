@@ -14,7 +14,6 @@ import { ShopScreen }          from './screens/ShopScreen';
 import { DailyRewardScreen }   from './screens/DailyRewardScreen';
 import { ChallengesScreen }    from './screens/ChallengesScreen';
 import { SettingsScreen }      from './screens/SettingsScreen';
-import { AdTestScreen }        from './screens/AdTestScreen';
 import { TimeAttackResultScreen } from './screens/TimeAttackResultScreen';
 import { EndlessResultScreen }    from './screens/EndlessResultScreen';
 
@@ -81,10 +80,6 @@ export const GameUI = () => {
 
         {phase === GamePhase.SETTINGS && (
           <SettingsScreen key="settings" />
-        )}
-
-        {phase === GamePhase.AD_TEST && (
-          <AdTestScreen key="adtest" />
         )}
 
       </AnimatePresence>

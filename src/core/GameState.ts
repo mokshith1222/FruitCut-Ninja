@@ -3,6 +3,7 @@ import { LevelRegistry } from './progression/LevelRegistry';
 import type { LevelConfig } from './progression/LevelTypes';
 import { AudioSystem } from '../audio/AudioSystem';
 import { HapticSystem } from '../haptics/HapticSystem';
+import { EventBus, GameEvents } from './EventBus';
 
 export const GamePhase = {
   BOOT: 'BOOT',
@@ -19,7 +20,6 @@ export const GamePhase = {
   SETTINGS: 'SETTINGS',
   DAILY_REWARD: 'DAILY_REWARD',
   CHALLENGES: 'CHALLENGES',
-  AD_TEST: 'AD_TEST',
 } as const;
 
 export type GamePhase = typeof GamePhase[keyof typeof GamePhase];
@@ -106,14 +106,14 @@ export const useGameState = create<GameState>((set) => ({
     return { score: state.score + points };
   }),
   updateCombo: (combo) => {
-    import('../core/EventBus').then(m => m.EventBus.emit(m.GameEvents.COMBO_CHANGED, combo));
+    EventBus.emit(GameEvents.COMBO_CHANGED, combo);
     set((state) => ({ 
       combo, 
       maxCombo: Math.max(state.maxCombo, combo) 
     }));
   },
   incrementFruitsCut: () => {
-    import('../core/EventBus').then(m => m.EventBus.emit(m.GameEvents.FRUIT_CUT));
+    EventBus.emit(GameEvents.FRUIT_CUT);
     set((state) => ({ fruitsCut: state.fruitsCut + 1 }));
   },
   incrementMisses: () => set((state) => ({ misses: state.misses + 1 })),
@@ -124,7 +124,7 @@ export const useGameState = create<GameState>((set) => ({
   levelComplete: () => {
     AudioSystem.playSound('win');
     HapticSystem.success();
-    import('../core/EventBus').then(m => m.EventBus.emit('LEVEL_COMPLETED', 'level'));
+    EventBus.emit('LEVEL_COMPLETED', 'level');
     set({ currentPhase: GamePhase.LEVEL_COMPLETE });
   },
   levelFailed: () => {

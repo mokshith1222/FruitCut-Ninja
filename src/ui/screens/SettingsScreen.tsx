@@ -10,7 +10,6 @@ import { AudioSystem } from '../../audio/AudioSystem';
 import { SaveSystem } from '../../save/SaveSystem';
 import { PrivacyPolicy } from '../../legal/PrivacyPolicy';
 import { TermsAndConditions } from '../../legal/TermsAndConditions';
-import { AdConfigManager } from '../../ads/AdConfig';
 
 const APP_VERSION = '1.0.0';
 
@@ -230,27 +229,6 @@ export const SettingsScreen = () => {
           <SettingRow label="Developer" right={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 'var(--fs-small)', fontWeight: 700 }}>M Sai Mokshith Naik</span>} />
         </motion.div>
 
-        {/* DEVELOPMENT AD TEST PANEL — visible when using Google test App ID */}
-        {AdConfigManager.getEnvironment() !== 'production' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-            <p style={{ fontSize: 'var(--fs-small)', fontWeight: 800, letterSpacing: '0.12em', color: 'var(--c-primary)', margin: '28px 0 4px' }}>
-              DEVELOPMENT TEST PANEL
-            </p>
-            <SettingRow 
-              label="Ad Testing Simulator" 
-              sublabel="Test interstitial & rewarded ad flows"
-              right={
-                <button 
-                  id="btn-ad-test-panel"
-                  className="btn btn--primary btn--sm" 
-                  onClick={() => setPhase(GamePhase.AD_TEST)}
-                >
-                  Open →
-                </button>
-              } 
-            />
-          </motion.div>
-        )}
       </div>
 
       {/* Confirmation Modal for Resetting Local Data */}

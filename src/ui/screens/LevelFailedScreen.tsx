@@ -1,29 +1,64 @@
 import { motion } from 'framer-motion';
-import { Screen } from '../components/Layout';
-import { Button } from '../components/Button';
 import { useGameState, GamePhase } from '../../core/GameState';
 import { useProgressionState } from '../../progression/ProgressionState';
 import { AdsManager } from '../../ads/AdsManager';
 import { GameFeelManager } from '../../gamefeel/GameFeelManager';
 import { useState, useEffect } from 'react';
+import { RetryIcon, MapIcon, ExitIcon } from '../icons/GameIcons';
 
-// Track single revive limit per session run
 let sessionReviveCount = 0;
+
+/* ─── Impact Flash ─────────────────────────────────────── */
+const ImpactShards = () => {
+  const shards = Array.from({ length: 8 }, (_, i) => ({
+    angle: (i / 8) * Math.PI * 2,
+    length: 30 + Math.random() * 50,
+    width: 2 + Math.random() * 3,
+  }));
+
+  return (
+    <motion.div
+      style={{ position: 'absolute', top: '22%', left: '50%', pointerEvents: 'none' }}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 0 }}
+      transition={{ delay: 0.9, duration: 0.4 }}
+    >
+      {shards.map((s, i) => (
+        <motion.div
+          key={i}
+          style={{
+            position: 'absolute',
+            left: 0, top: 0,
+            width: s.width,
+            height: s.length,
+            background: 'linear-gradient(to bottom, #FF2A5F, transparent)',
+            borderRadius: 2,
+            transformOrigin: 'top center',
+            rotate: `${s.angle * (180 / Math.PI)}deg`,
+          }}
+          initial={{ scaleY: 0, opacity: 1 }}
+          animate={{ scaleY: 1, opacity: 0, y: Math.cos(s.angle) * 40 + 20 }}
+          transition={{ delay: 0.1 + i * 0.03, duration: 0.5, ease: 'easeOut' }}
+        />
+      ))}
+    </motion.div>
+  );
+};
 
 export const LevelFailedScreen = () => {
   const { startGame, setPhase, score, currentLevelId, currentLevelConfig, misses, reviveGame } = useGameState();
   const { completedLevels, updateBestScores } = useProgressionState();
-  const [adLoading, setAdLoading] = useState(false);
-  const [adError, setAdError] = useState<string | null>(null);
+  const [adLoading, setAdLoading]   = useState(false);
+  const [adError, setAdError]       = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [recorded, setRecorded] = useState(false);
-  const [isNewBest, setIsNewBest] = useState(false);
+  const [recorded, setRecorded]     = useState(false);
+  const [isNewBest, setIsNewBest]   = useState(false);
 
-  const isSpecialMode = currentLevelId === 'time_attack' || currentLevelId === 'endless';
-  const isTimeAttack = currentLevelId === 'time_attack';
-  const canRevive = !isTimeAttack && sessionReviveCount < 1;
-  const levelNum = currentLevelId?.replace('level_', '') ?? '?';
-  const displayLevel = isSpecialMode ? (isTimeAttack ? 'Time Attack' : 'Endless') : levelNum;
+  const isSpecialMode  = currentLevelId === 'time_attack' || currentLevelId === 'endless';
+  const isTimeAttack   = currentLevelId === 'time_attack';
+  const canRevive      = !isTimeAttack && sessionReviveCount < 1;
+  const levelNum       = currentLevelId?.replace('level_', '') ?? '?';
+  const displayTitle   = isSpecialMode ? (isTimeAttack ? 'Time Attack' : 'Endless') : `Level ${levelNum}`;
 
   useEffect(() => {
     GameFeelManager.onLevelFailed();
@@ -38,7 +73,7 @@ export const LevelFailedScreen = () => {
   const handleNextAction = async (action: () => void) => {
     if (isNavigating) return;
     setIsNavigating(true);
-    sessionReviveCount = 0; // reset revive count on new run / exit
+    sessionReviveCount = 0;
     if (AdsManager.shouldShowInterstitial(completedLevels.length)) {
       await AdsManager.showInterstitial(completedLevels.length);
     }
@@ -49,7 +84,6 @@ export const LevelFailedScreen = () => {
     if (adLoading || !canRevive) return;
     setAdLoading(true);
     setAdError(null);
-
     await AdsManager.showRewardedAd({
       rewardType: 'REVIVE',
       amount: 1,
@@ -59,98 +93,132 @@ export const LevelFailedScreen = () => {
         GameFeelManager.onRewardClaimed();
         reviveGame();
       },
-      onCancel: () => {
-        setAdLoading(false);
-      },
-      onError: () => {
-        setAdLoading(false);
-        setAdError('Ad unavailable right now.');
-      }
+      onCancel: () => setAdLoading(false),
+      onError: () => { setAdLoading(false); setAdError('Ad unavailable right now.'); },
     });
   };
 
   const failReason = () => {
     const hasBombObj = currentLevelConfig?.objectives?.some(o => o.type === 'NO_BOMB' || o.type === 'BOMB_AVOIDANCE');
-    if (currentLevelConfig?.noBombsAllowed || hasBombObj) return 'You cut a bomb! 💣';
-    if (misses >= (currentLevelConfig?.missLimit || 3)) return `Too many misses (${misses})`;
-    if ((currentLevelConfig?.duration ?? 0) > 0) return 'Time ran out! ⏱';
-    return 'Better luck next time!';
+    if (currentLevelConfig?.noBombsAllowed || hasBombObj) return 'Bomb detonated';
+    if (misses >= (currentLevelConfig?.missLimit || 3))   return 'Too many misses';
+    if ((currentLevelConfig?.duration ?? 0) > 0)          return 'Time expired';
+    return 'Better luck next time';
   };
 
   return (
-    <Screen>
+    <div className="screen screen--blur-bg" style={{ overflow: 'hidden' }}>
+      <ImpactShards/>
+
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 'var(--sp-xl)', width: '100%', maxWidth: 360, padding: '0 24px',
+        gap: 0, width: '100%', maxWidth: 400,
+        padding: 'max(env(safe-area-inset-top, 0px), 24px) 24px max(env(safe-area-inset-bottom, 0px), 24px)',
+        height: '100%', justifyContent: 'center',
+        position: 'relative', zIndex: 1,
       }}>
-        {/* Icon + title */}
+
+        {/* Failure icon — geometric, not emoji */}
         <motion.div
-          style={{ textAlign: 'center' }}
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+          initial={{ scale: 0, rotate: -90, opacity: 0 }}
+          animate={{ scale: 1, rotate: 0, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+          style={{ marginBottom: 16 }}
         >
-          <motion.div
-            style={{ fontSize: '3.5rem', marginBottom: 8 }}
-            animate={{ rotate: [0, -8, 8, 0] }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            💥
-          </motion.div>
+          <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+            <circle cx="36" cy="36" r="34" fill="rgba(255,23,68,0.12)" stroke="rgba(255,23,68,0.4)" strokeWidth="2"/>
+            <motion.path
+              d="M22 22 L50 50 M50 22 L22 50"
+              stroke="#FF2A5F"
+              strokeWidth="5"
+              strokeLinecap="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 0.3, duration: 0.4, ease: 'easeOut' }}
+            />
+          </svg>
+        </motion.div>
+
+        {/* Title */}
+        <motion.div
+          initial={{ y: 16, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.35 }}
+          style={{ textAlign: 'center', marginBottom: 24 }}
+        >
           <h1 style={{
-            fontSize: 'var(--fs-heading)', fontWeight: 900,
-            background: 'linear-gradient(135deg, #FF5252 20%, #FF1744 80%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            fontFamily: 'var(--font-brand)',
+            fontSize: 'clamp(1.6rem, 5vw, 2.2rem)',
+            fontWeight: 900,
+            background: 'var(--grad-danger)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            letterSpacing: '0.04em',
+            marginBottom: 8,
           }}>
-            {isSpecialMode ? 'Game Over' : 'Level Failed'}
+            {isSpecialMode ? 'GAME OVER' : 'LEVEL FAILED'}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 'var(--fs-body)', marginTop: 8 }}>
+          <p style={{ color: 'var(--c-text-sub)', fontSize: '0.9rem', letterSpacing: '0.02em' }}>
             {failReason()}
           </p>
         </motion.div>
 
-        {/* Stats */}
+        {/* Stats card */}
         <motion.div
           className="panel"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}
+          transition={{ delay: 0.25, duration: 0.35 }}
+          style={{
+            width: '100%', marginBottom: 20,
+            padding: '0', overflow: 'hidden',
+          }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.6)' }}>Mode</span>
-            <strong>{displayLevel}</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--c-text-sub)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Mode
+            </span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 900 }}>{displayTitle}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.6)' }}>Score</span>
-            <strong>{score.toLocaleString()}</strong>
+          <div className="divider" style={{ margin: 0 }}/>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--c-text-sub)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Score
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-brand)',
+              fontSize: '1.3rem', fontWeight: 900,
+            }}>
+              {score.toLocaleString()}
+            </span>
           </div>
           {isSpecialMode && isNewBest && (
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 10, stiffness: 300, delay: 0.5 }}
-              style={{ textAlign: 'center', color: 'var(--c-secondary)', fontWeight: 900, fontSize: '1.2rem', marginTop: 8, textShadow: '0 0 10px rgba(255,215,0,0.5)' }}
-            >
-              NEW BEST!
-            </motion.div>
+            <>
+              <div className="divider" style={{ margin: 0 }}/>
+              <div style={{ padding: '10px 20px', textAlign: 'center' }}>
+                <motion.span
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
+                  style={{ fontSize: '0.8rem', fontWeight: 900, color: '#FFD740', letterSpacing: '0.1em' }}
+                >
+                  ✦ NEW BEST ✦
+                </motion.span>
+              </div>
+            </>
           )}
         </motion.div>
 
-        {/* Ad Error Banner if applicable */}
+        {/* Ad error */}
         {adError && (
           <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              background: 'rgba(255, 68, 68, 0.15)',
-              border: '1px solid rgba(255, 68, 68, 0.3)',
-              color: '#ff8888',
-              fontSize: '0.85rem',
-              textAlign: 'center',
-              width: '100%'
+              padding: '8px 14px', borderRadius: 'var(--r-md)',
+              background: 'rgba(255,23,68,0.12)', border: '1px solid rgba(255,23,68,0.3)',
+              color: '#ff8888', fontSize: '0.8rem', textAlign: 'center',
+              width: '100%', marginBottom: 10,
             }}
           >
             {adError}
@@ -159,42 +227,61 @@ export const LevelFailedScreen = () => {
 
         {/* Actions */}
         <motion.div
-          style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
+          transition={{ delay: 0.4, duration: 0.35 }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}
         >
+          {/* Revive button */}
           {canRevive && (
-            <>
-              <Button
-                id="btn-revive"
-                label={adLoading ? 'Loading Ad...' : '🎥  Watch Ad to Revive (1x)'}
-                onClick={handleRevive}
-                variant="secondary" size="xl" fullWidth disabled={adLoading || isNavigating}
-              />
-              <div className="divider" style={{ margin: '4px 0' }} />
-            </>
+            <motion.button
+              className="btn btn--secondary btn--lg"
+              style={{ width: '100%' }}
+              onClick={handleRevive}
+              disabled={adLoading || isNavigating}
+              whileTap={{ scale: 0.94 }}
+            >
+              {adLoading ? 'Loading...' : 'Watch Ad · Revive (1×)'}
+            </motion.button>
           )}
-          <Button
-            id="btn-retry"
-            label="↺  Try Again"
+
+          {/* Retry */}
+          <motion.button
+            className="btn btn--primary btn--xl"
+            style={{ width: '100%', gap: 10 }}
             onClick={() => { if (currentLevelId) handleNextAction(() => startGame(currentLevelId)); }}
-            variant="primary" size="xl" fullWidth disabled={adLoading || isNavigating}
-          />
-          <Button
-            id="btn-map-failed"
-            label="🗺  Level Map"
-            onClick={() => handleNextAction(() => setPhase(GamePhase.LEVEL_LOADING))}
-            variant="ghost" size="md" fullWidth disabled={adLoading || isNavigating}
-          />
-          <Button
-            id="btn-exit-failed"
-            label="Main Menu"
-            onClick={() => handleNextAction(() => setPhase(GamePhase.MAIN_MENU))}
-            variant="danger" size="md" fullWidth disabled={adLoading || isNavigating}
-          />
+            disabled={adLoading || isNavigating}
+            whileTap={{ scale: 0.94 }}
+          >
+            <RetryIcon size={20}/>
+            Try Again
+          </motion.button>
+
+          {/* Map + Exit row */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <motion.button
+              className="btn btn--ghost btn--md"
+              style={{ flex: 1, gap: 8 }}
+              onClick={() => handleNextAction(() => setPhase(GamePhase.LEVEL_LOADING))}
+              disabled={adLoading || isNavigating}
+              whileTap={{ scale: 0.92 }}
+            >
+              <MapIcon size={16}/>
+              Level Map
+            </motion.button>
+            <motion.button
+              className="btn btn--danger btn--md"
+              style={{ flex: 1, gap: 8 }}
+              onClick={() => handleNextAction(() => setPhase(GamePhase.MAIN_MENU))}
+              disabled={adLoading || isNavigating}
+              whileTap={{ scale: 0.92 }}
+            >
+              <ExitIcon size={16}/>
+              Exit
+            </motion.button>
+          </div>
         </motion.div>
       </div>
-    </Screen>
+    </div>
   );
 };

@@ -26,7 +26,11 @@ export const AppSaveManager = {
     const chalData = {
       daily: challengeState.daily,
       weekly: challengeState.weekly,
+      bounties: challengeState.bounties,
       milestones: challengeState.milestones,
+      dynamicDefinitions: challengeState.dynamicDefinitions,
+      freeRerollsRemaining: challengeState.freeRerollsRemaining,
+      lastRerollDate: challengeState.lastRerollDate,
       streak: challengeState.streak
     };
     
